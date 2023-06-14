@@ -131,7 +131,7 @@ impl EGLUnderlay {
 
             gl.bind_vertex_array(Some(self.vao));
 
-            let elapsed = self.start_time.elapsed().as_secs() as f32;
+            let elapsed = self.start_time.elapsed().as_millis() as f32 / 1000.0;
             gl.uniform_1_f32(Some(&self.effect_time_location), elapsed);
             //gl.uniform_1_f32(
             //    Some(&self.rotation_time_location),
@@ -253,8 +253,8 @@ slint::slint! {
                 VerticalLayout {
                     alignment: start;
                     apply-rotation := CheckBox {
-                        checked: true;
-                        text: "Rotate the OpenGL underlay";
+                        checked: false;
+                        text: "Cool Colours";
                     }
                 }
             }

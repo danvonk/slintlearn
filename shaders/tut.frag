@@ -14,7 +14,7 @@ float roundRectDistance(vec2 pos, vec2 rect_size, float radius)
 }
 
 float effect(vec2 pos_x, float time, vec2 pos_p) {
-    return sin(20.0 * abs(pos_x - pos_p) - time);
+    return sin(20.0 * length(pos_x - pos_p) - time);
 }
 
 //void main() {
@@ -51,12 +51,7 @@ void main() {
 
     vec2 p0 = vec2(0.0, 0.0);
     vec2 p1 = vec2(-0.5, -0.5);
-    float r = 0.2;
 
-    if (coord_normd.x * coord_normd.x + coord_normd.y * coord_normd.y < r * r) {
-        gl_FragColor = vec4(sin(effect_time), cos(effect_time), 0.0, 1.0);
-    } else {
-        float u = effect(coord_normd, effect_time, p0) + effect(coord_normd, effect_time, p1);
-        gl_FragColor = vec4(grey(0.5 + u/ 4.0), 1.0);
-    }
+    float u = effect(coord_normd, effect_time, p0) + effect(coord_normd, effect_time, p1);
+    gl_FragColor = vec4(hue(0.5 + u / 4.0), 1.0);
 }
