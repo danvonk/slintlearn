@@ -1,25 +1,29 @@
 mod mesh;
 mod shapes;
 
+use std::rc::Rc;
+
 use glow::HasContext;
 use nalgebra_glm::Vec2;
 
 use shapes::Circle;
-use slint::private_unstable_api::re_exports::PointerEventKind;
+use slint::{platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind};
 
 struct EGLUnderlay {
     gl: glow::Context,
     program: glow::Program,
     effect_time_location: glow::UniformLocation,
-    rotation_time_location: glow::UniformLocation,
+    res_location: glow::UniformLocation,
     vbo: glow::Buffer,
     vao: glow::VertexArray,
     start_time: std::time::Instant,
     circle: Circle,
+    window_x: f32,
+    window_y: f32,
 }
 
 impl EGLUnderlay {
-    fn new(gl: glow::Context) -> Self {
+    fn new(gl: glow::Context, w: f32, h: f32) -> Self {
         unsafe {
             let program = gl.create_program().expect("Cannot create program");
 
@@ -59,8 +63,8 @@ impl EGLUnderlay {
             }
 
             let effect_time_location = gl.get_uniform_location(program, "effect_time").unwrap();
-            let rotation_time_location = gl.get_uniform_location(program, "rotation_time").unwrap();
             let position_location = gl.get_attrib_location(program, "position").unwrap();
+            let res_location = gl.get_uniform_location(program, "resolution").unwrap();
 
             let vbo = gl.create_buffer().expect("Cannot create buffer");
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
@@ -87,11 +91,13 @@ impl EGLUnderlay {
                 gl,
                 program,
                 effect_time_location,
-                rotation_time_location,
+                res_location,
                 vbo,
                 vao,
                 start_time: std::time::Instant::now(),
                 circle,
+                window_x: w,
+                window_y: h,
             }
         }
     }
@@ -125,12 +131,15 @@ impl EGLUnderlay {
 
             gl.bind_vertex_array(Some(self.vao));
 
-            let elapsed = self.start_time.elapsed().as_millis() as f32;
+            let elapsed = self.start_time.elapsed().as_secs() as f32;
             gl.uniform_1_f32(Some(&self.effect_time_location), elapsed);
-            gl.uniform_1_f32(
-                Some(&self.rotation_time_location),
-                if rotation_enabled { elapsed } else { 0.0 },
-            );
+            //gl.uniform_1_f32(
+            //    Some(&self.rotation_time_location),
+            //    if rotation_enabled { elapsed } else { 0.0 },
+            //);
+
+
+            gl.uniform_2_f32(Some(&self.res_location), self.window_x, self.window_y);
 
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
 
@@ -138,7 +147,7 @@ impl EGLUnderlay {
             gl.bind_vertex_array(old_vao);
             gl.use_program(None);
 
-            self.circle.render(gl);
+            //self.circle.render(gl);
         }
     }
 }
@@ -150,13 +159,23 @@ pub fn main() {
 
     let app_weak = app.as_weak();
 
-    app.on_pointer_event(|event| match event.kind {
-        PointerEventKind::Down => {
-            println!("Mouse down");
-        }
-        PointerEventKind::Up => {
-            println!("Mouse up");
-        }
+    let circs = Rc::new(slint::VecModel::<Circ>::from(vec![Circ {
+        pos_x: 210.0,
+        pos_y: 10.0,
+    }]));
+    app.set_points(circs.clone().into());
+
+    app.on_add_point(move |event, mouse_x, mouse_y| match event.button {
+        PointerEventButton::Left => match event.kind {
+            PointerEventKind::Up => {
+                let circs_model = circs.clone();
+                circs_model.push(Circ {
+                    pos_x: mouse_x,
+                    pos_y: mouse_y,
+                });
+            }
+            _ => {}
+        },
         _ => {}
     });
 
@@ -170,7 +189,7 @@ pub fn main() {
                         },
                         _ => return,
                     };
-                    underlay = Some(EGLUnderlay::new(context))
+                    underlay = Some(EGLUnderlay::new(context, 800.0, 600.0));
                 }
                 slint::RenderingState::BeforeRendering => {
                     if let (Some(underlay), Some(app)) = (underlay.as_mut(), app_weak.upgrade()) {
@@ -192,23 +211,35 @@ pub fn main() {
         std::process::exit(1);
     }
 
+    let window_size = app.window().size();
+    println!(
+        "Window size is {} {}",
+        window_size.width, window_size.height
+    );
+
     app.run().unwrap();
 }
 
 slint::slint! {
     import { Button, VerticalBox, HorizontalBox, CheckBox } from "std-widgets.slint";
 
+    export struct Circ {
+        pos-x: length,
+        pos-y: length,
+    }
+
     export component MainWindow inherits Window {
 
-    preferred-width: 800px;
-    preferred-height: 600px;
+    width: 800px;
+    height: 600px;
     title: "Slint OpenGL Underlay Example";
 
     in property <bool> rotation-enabled <=> apply-rotation.checked;
+    in property <[Circ]> points;
+
 
     callback clicked();
-    callback pointer_event(PointerEvent);
-
+    callback add_point(PointerEvent, length, length);
 
     VerticalBox {
         Rectangle {
@@ -229,26 +260,23 @@ slint::slint! {
             }
         }
         Rectangle {
+            // rectangle fills the rest of the screen
             area := TouchArea {
-                //clicked => {
-                //    clicked();
-                //}
                 pointer-event(e) => {
-                    root.pointer_event(e);
+                    root.add_point(e, self.mouse-x, self.mouse-y);
                 }
             }
- // A radius of width/2 makes it a circle
-    Rectangle {
-        x: 210px;
-        y: 10px;
-        width: 50px;
-        height: 50px;
-        background: yellow;
-        border-width: 2px;
-        border-color: blue;
-        border-radius: self.width/2;
-    }
-        } // fill the rest of the screen
+            for r in root.points : Rectangle {
+                x: r.pos-x;
+                y: r.pos-y;
+                width: 20px;
+                height: 20px;
+                background: yellow;
+                border-width: 2px;
+                border-color: blue;
+                border-radius: self.width/2;
+            }
+        }
     }
 }
 }
