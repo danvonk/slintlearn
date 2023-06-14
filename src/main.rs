@@ -1,40 +1,34 @@
 mod mesh;
 mod shapes;
 
-use std::rc::Rc;
+use std::{rc::Rc, collections::HashMap};
 
 use glow::HasContext;
 use nalgebra_glm::Vec2;
 
 use shapes::Circle;
-use slint::{platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind};
+use slint::{platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind, Model};
 
 struct EGLUnderlay {
     gl: glow::Context,
     program: glow::Program,
-    effect_time_location: glow::UniformLocation,
-    res_location: glow::UniformLocation,
+    uniform_locs: HashMap<String, glow::UniformLocation>,
     vbo: glow::Buffer,
     vao: glow::VertexArray,
     start_time: std::time::Instant,
-    circle: Circle,
     window_x: f32,
     window_y: f32,
+    points: Rc<slint::VecModel<Circ>>,
 }
 
 impl EGLUnderlay {
-    fn new(gl: glow::Context, w: f32, h: f32) -> Self {
+    fn new(gl: glow::Context, w: f32, h: f32, pts: Rc<slint::VecModel<Circ>>) -> Self {
         unsafe {
             let program = gl.create_program().expect("Cannot create program");
 
-            let (vertex_shader_source, fragment_shader_source) = (
-                include_str!("../shaders/tut.vert"),
-                include_str!("../shaders/tut.frag"),
-            );
-
             let shader_sources = [
-                (glow::VERTEX_SHADER, vertex_shader_source),
-                (glow::FRAGMENT_SHADER, fragment_shader_source),
+                (glow::VERTEX_SHADER, include_str!("../shaders/tut.vert")),
+                (glow::FRAGMENT_SHADER, include_str!("../shaders/tut.frag")),
             ];
 
             let mut shaders = Vec::with_capacity(shader_sources.len());
@@ -62,19 +56,22 @@ impl EGLUnderlay {
                 gl.delete_shader(shader);
             }
 
-            let effect_time_location = gl.get_uniform_location(program, "effect_time").unwrap();
-            let position_location = gl.get_attrib_location(program, "position").unwrap();
-            let res_location = gl.get_uniform_location(program, "resolution").unwrap();
+            let loc_map = HashMap::<String, glow::UniformLocation>::from([
+                ("effect_time".into(), gl.get_uniform_location(program, "effect_time").unwrap()),
+                ("resolution".into(), gl.get_uniform_location(program, "resolution").unwrap()),
+                ("cool_colours".into(), gl.get_uniform_location(program, "cool_colours").unwrap()),
+                ("points".into(), gl.get_uniform_location(program, "points").unwrap()),
+                ("has_points".into(), gl.get_uniform_location(program, "has_points").unwrap())
+            ]);
 
             let vbo = gl.create_buffer().expect("Cannot create buffer");
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
-
             let vertices = [
                 -1.0f32, 1.0f32, -1.0f32, -1.0f32, 1.0f32, 1.0f32, 1.0f32, -1.0f32,
             ];
-
             gl.buffer_data_u8_slice(glow::ARRAY_BUFFER, vertices.align_to().1, glow::STATIC_DRAW);
 
+            let position_location = gl.get_attrib_location(program, "position").unwrap();
             let vao = gl
                 .create_vertex_array()
                 .expect("Cannot create vertex array");
@@ -85,19 +82,17 @@ impl EGLUnderlay {
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
             gl.bind_vertex_array(None);
 
-            let circle = Circle::new(&gl, Vec2::new(-0.5, -0.5), 0.1);
 
             Self {
                 gl,
                 program,
-                effect_time_location,
-                res_location,
+                uniform_locs: loc_map,
                 vbo,
                 vao,
                 start_time: std::time::Instant::now(),
-                circle,
                 window_x: w,
                 window_y: h,
+                points: pts,
             }
         }
     }
@@ -114,7 +109,7 @@ impl Drop for EGLUnderlay {
 }
 
 impl EGLUnderlay {
-    fn render(&mut self, rotation_enabled: bool) {
+    fn render(&mut self, cool_colours: bool) {
         unsafe {
             let gl = &self.gl;
 
@@ -132,14 +127,30 @@ impl EGLUnderlay {
             gl.bind_vertex_array(Some(self.vao));
 
             let elapsed = self.start_time.elapsed().as_millis() as f32 / 1000.0;
-            gl.uniform_1_f32(Some(&self.effect_time_location), elapsed);
-            //gl.uniform_1_f32(
-            //    Some(&self.rotation_time_location),
-            //    if rotation_enabled { elapsed } else { 0.0 },
-            //);
 
+            gl.uniform_1_f32(Some(&self.uniform_locs["effect_time"]), elapsed);
+            gl.uniform_1_i32(
+                Some(&self.uniform_locs["cool_colours"]),
+                if cool_colours { 1 } else { 0 },
+            );
+            gl.uniform_1_i32(Some(&self.uniform_locs["has_points"]), if self.points.row_count() >= 1  {1} else {0});
+            gl.uniform_2_f32(Some(&self.uniform_locs["resolution"]), self.window_x, self.window_y);
 
-            gl.uniform_2_f32(Some(&self.res_location), self.window_x, self.window_y);
+            let points_vec = match self.points.row_count() {
+                1 => {
+                    let p = self.points.row_data(0).unwrap();
+                    nalgebra_glm::Vec4::new(p.pos_x, f32::max(0.0, self.window_y - p.pos_y), 0.0, 0.0)
+                },
+                2 => {
+                    let p = self.points.row_data(0).unwrap();
+                    let q = self.points.row_data(1).unwrap();
+                    nalgebra_glm::Vec4::new(p.pos_x, p.pos_y, q.pos_x, q.pos_y)
+                },
+                _ => nalgebra_glm::Vec4::new(0.0, 0.0, 0.0, 0.0),
+            };
+            gl.uniform_4_f32_slice(Some(&self.uniform_locs["points"]), points_vec.as_slice());
+
+            println!("Points is {}", points_vec);
 
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
 
@@ -147,7 +158,6 @@ impl EGLUnderlay {
             gl.bind_vertex_array(old_vao);
             gl.use_program(None);
 
-            //self.circle.render(gl);
         }
     }
 }
@@ -159,20 +169,22 @@ pub fn main() {
 
     let app_weak = app.as_weak();
 
-    let circs = Rc::new(slint::VecModel::<Circ>::from(vec![Circ {
-        pos_x: 210.0,
-        pos_y: 10.0,
-    }]));
+    let circs = Rc::new(slint::VecModel::<Circ>::from(vec![]));
     app.set_points(circs.clone().into());
+
+    let circ_clone = circs.clone();
 
     app.on_add_point(move |event, mouse_x, mouse_y| match event.button {
         PointerEventButton::Left => match event.kind {
             PointerEventKind::Up => {
                 let circs_model = circs.clone();
-                circs_model.push(Circ {
-                    pos_x: mouse_x,
-                    pos_y: mouse_y,
-                });
+                if circs_model.row_count() < 2 {
+                    println!("Mouse is at ({},{})", mouse_x, mouse_y);
+                    circs_model.push(Circ {
+                        pos_x: mouse_x,
+                        pos_y: mouse_y,
+                    });
+                }
             }
             _ => {}
         },
@@ -189,11 +201,14 @@ pub fn main() {
                         },
                         _ => return,
                     };
-                    underlay = Some(EGLUnderlay::new(context, 800.0, 600.0));
+                    unsafe {
+                        context.viewport(0, 0, 800, 600);
+                    }
+                    underlay = Some(EGLUnderlay::new(context, 800.0, 600.0, circ_clone.clone()));
                 }
                 slint::RenderingState::BeforeRendering => {
                     if let (Some(underlay), Some(app)) = (underlay.as_mut(), app_weak.upgrade()) {
-                        underlay.render(true);
+                        underlay.render(app.get_colours_enabled());
                         app.window().request_redraw();
                     }
                 }
@@ -234,7 +249,7 @@ slint::slint! {
     height: 600px;
     title: "Slint OpenGL Underlay Example";
 
-    in property <bool> rotation-enabled <=> apply-rotation.checked;
+    in property <bool> colours-enabled <=> apply-colours.checked;
     in property <[Circ]> points;
 
 
@@ -252,7 +267,7 @@ slint::slint! {
 
                 VerticalLayout {
                     alignment: start;
-                    apply-rotation := CheckBox {
+                    apply-colours := CheckBox {
                         checked: false;
                         text: "Cool Colours";
                     }
