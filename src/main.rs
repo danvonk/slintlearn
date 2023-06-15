@@ -4,13 +4,13 @@ mod shapes;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use std::{collections::HashMap, rc::Rc};
 use glow::HasContext;
 use nalgebra_glm::Vec2;
 use shapes::Circle;
 use slint::{
     platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind, Model,
 };
+use std::{collections::HashMap, rc::Rc};
 
 struct EGLUnderlay {
     gl: glow::Context,
@@ -173,7 +173,12 @@ impl EGLUnderlay {
                 2 => {
                     let p = self.points.row_data(0).unwrap();
                     let q = self.points.row_data(1).unwrap();
-                    nalgebra_glm::Vec4::new(p.pos_x, p.pos_y, q.pos_x, q.pos_y)
+                    nalgebra_glm::Vec4::new(
+                        p.pos_x,
+                        f32::max(0.0, self.window_y - p.pos_y),
+                        q.pos_x,
+                        f32::max(0.0, self.window_y - q.pos_y),
+                    )
                 }
                 _ => nalgebra_glm::Vec4::new(0.0, 0.0, 0.0, 0.0),
             };

@@ -37,10 +37,11 @@ void main() {
     float u = 0.0;
 
     vec2 p0 = vec2(points.x, points.y);
-    vec2 p1 = vec2(points.z, max(0.0, (resolution.y - points.w)));
+    vec2 p1 = vec2(points.z, points.w);
+    // vec2 p1 = vec2(points.z, max(0.0, (resolution.y - points.w)));
 
     p0 = (2.0 * p0 / resolution) - 1.0;
-    p1 = (2.0 * p0 / resolution) - 1.0;
+    p1 = (2.0 * p1 / resolution) - 1.0;
 
     if (length(p0) > 0.1) {
         u += effect(coord_normd, effect_time, p0);
