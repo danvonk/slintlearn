@@ -1,13 +1,16 @@
 mod mesh;
 mod shapes;
 
-use std::{rc::Rc, collections::HashMap};
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
+use std::{collections::HashMap, rc::Rc};
 use glow::HasContext;
 use nalgebra_glm::Vec2;
-
 use shapes::Circle;
-use slint::{platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind, Model};
+use slint::{
+    platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind, Model,
+};
 
 struct EGLUnderlay {
     gl: glow::Context,
@@ -57,11 +60,26 @@ impl EGLUnderlay {
             }
 
             let loc_map = HashMap::<String, glow::UniformLocation>::from([
-                ("effect_time".into(), gl.get_uniform_location(program, "effect_time").unwrap()),
-                ("resolution".into(), gl.get_uniform_location(program, "resolution").unwrap()),
-                ("cool_colours".into(), gl.get_uniform_location(program, "cool_colours").unwrap()),
-                ("points".into(), gl.get_uniform_location(program, "points").unwrap()),
-                ("has_points".into(), gl.get_uniform_location(program, "has_points").unwrap())
+                (
+                    "effect_time".into(),
+                    gl.get_uniform_location(program, "effect_time").unwrap(),
+                ),
+                (
+                    "resolution".into(),
+                    gl.get_uniform_location(program, "resolution").unwrap(),
+                ),
+                (
+                    "cool_colours".into(),
+                    gl.get_uniform_location(program, "cool_colours").unwrap(),
+                ),
+                (
+                    "points".into(),
+                    gl.get_uniform_location(program, "points").unwrap(),
+                ),
+                (
+                    "has_points".into(),
+                    gl.get_uniform_location(program, "has_points").unwrap(),
+                ),
             ]);
 
             let vbo = gl.create_buffer().expect("Cannot create buffer");
@@ -81,7 +99,6 @@ impl EGLUnderlay {
 
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
             gl.bind_vertex_array(None);
-
 
             Self {
                 gl,
@@ -133,19 +150,31 @@ impl EGLUnderlay {
                 Some(&self.uniform_locs["cool_colours"]),
                 if cool_colours { 1 } else { 0 },
             );
-            gl.uniform_1_i32(Some(&self.uniform_locs["has_points"]), if self.points.row_count() >= 1  {1} else {0});
-            gl.uniform_2_f32(Some(&self.uniform_locs["resolution"]), self.window_x, self.window_y);
+            gl.uniform_1_i32(
+                Some(&self.uniform_locs["has_points"]),
+                if self.points.row_count() >= 1 { 1 } else { 0 },
+            );
+            gl.uniform_2_f32(
+                Some(&self.uniform_locs["resolution"]),
+                self.window_x,
+                self.window_y,
+            );
 
             let points_vec = match self.points.row_count() {
                 1 => {
                     let p = self.points.row_data(0).unwrap();
-                    nalgebra_glm::Vec4::new(p.pos_x, f32::max(0.0, self.window_y - p.pos_y), 0.0, 0.0)
-                },
+                    nalgebra_glm::Vec4::new(
+                        p.pos_x,
+                        f32::max(0.0, self.window_y - p.pos_y),
+                        0.0,
+                        0.0,
+                    )
+                }
                 2 => {
                     let p = self.points.row_data(0).unwrap();
                     let q = self.points.row_data(1).unwrap();
                     nalgebra_glm::Vec4::new(p.pos_x, p.pos_y, q.pos_x, q.pos_y)
-                },
+                }
                 _ => nalgebra_glm::Vec4::new(0.0, 0.0, 0.0, 0.0),
             };
             gl.uniform_4_f32_slice(Some(&self.uniform_locs["points"]), points_vec.as_slice());
@@ -157,11 +186,11 @@ impl EGLUnderlay {
             gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
             gl.bind_vertex_array(old_vao);
             gl.use_program(None);
-
         }
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub fn main() {
     let app = MainWindow::new().unwrap();
 
@@ -196,9 +225,35 @@ pub fn main() {
             .set_rendering_notifier(move |state, graphics_api| match state {
                 slint::RenderingState::RenderingSetup => {
                     let context = match graphics_api {
+                        #[cfg(not(target_arch = "wasm32"))]
                         slint::GraphicsAPI::NativeOpenGL { get_proc_address } => unsafe {
                             glow::Context::from_loader_function_cstr(|s| get_proc_address(s))
                         },
+                        #[cfg(target_arch = "wasm32")]
+                        slint::GraphicsAPI::WebGL {
+                            canvas_element_id,
+                            context_type,
+                        } => {
+                            use wasm_bindgen::JsCast;
+
+                            let canvas = web_sys::window()
+                                .unwrap()
+                                .document()
+                                .unwrap()
+                                .get_element_by_id(canvas_element_id)
+                                .unwrap()
+                                .dyn_into::<web_sys::HtmlCanvasElement>()
+                                .unwrap();
+
+                            let webgl1_context = canvas
+                                .get_context(context_type)
+                                .unwrap()
+                                .unwrap()
+                                .dyn_into::<web_sys::WebGlRenderingContext>()
+                                .unwrap();
+
+                            glow::Context::from_webgl1_context(webgl1_context)
+                        }
                         _ => return,
                     };
                     unsafe {

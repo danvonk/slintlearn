@@ -9,4 +9,15 @@ edition = "2021"
 glow = "0.12.2"
 nalgebra-glm = "0.18.0"
 slint = "1.0.2"
-vulkano-shaders = "0.33.0"
+
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/main.rs"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-pack = "0.11.1"
+wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3", features=["console"] }
+console_error_panic_hook = "0.1.5"
+instant = { version = "0.1", features = [ "wasm-bindgen" ] }
