@@ -11,6 +11,7 @@ use slint::{
     platform::PointerEventButton, private_unstable_api::re_exports::PointerEventKind, Model,
 };
 use std::{collections::HashMap, rc::Rc};
+use instant::*;
 
 struct EGLUnderlay {
     gl: glow::Context,
@@ -18,7 +19,7 @@ struct EGLUnderlay {
     uniform_locs: HashMap<String, glow::UniformLocation>,
     vbo: glow::Buffer,
     vao: glow::VertexArray,
-    start_time: std::time::Instant,
+    start_time: instant::Instant,
     window_x: f32,
     window_y: f32,
     points: Rc<slint::VecModel<Circ>>,
@@ -106,7 +107,7 @@ impl EGLUnderlay {
                 uniform_locs: loc_map,
                 vbo,
                 vao,
-                start_time: std::time::Instant::now(),
+                start_time: instant::Instant::now(),
                 window_x: w,
                 window_y: h,
                 points: pts,
