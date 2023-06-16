@@ -1,0 +1,14 @@
+{
+  "name": "rigidbod",
+  "version": "0.1.0",
+  "files": [
+    "rigidbod_bg.wasm",
+    "rigidbod.js",
+    "rigidbod.d.ts"
+  ],
+  "module": "rigidbod.js",
+  "types": "rigidbod.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
