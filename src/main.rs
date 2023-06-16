@@ -323,7 +323,7 @@ slint::slint! {
             background: #ffffff92;
             HorizontalBox {
                 Text {
-                    text: "This text is rendered using Slint. The animation below is rendered using OpenGL code.";
+                    text: "Click somewhere below...";
                     wrap: word-wrap;
                 }
 
