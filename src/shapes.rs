@@ -98,14 +98,14 @@ impl Circle {
         unsafe {
             gl.use_program(Some(self.shader));
 
-            let old_buffer =
-                std::num::NonZeroU32::new(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING) as u32)
-                    .map(glow::NativeBuffer);
+            //let old_buffer =
+            //    std::num::NonZeroU32::new(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING) as u32)
+            //        .map(glow::NativeBuffer);
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
 
-            let old_vao =
-                std::num::NonZeroU32::new(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING) as u32)
-                    .map(glow::NativeVertexArray);
+            //let old_vao =
+            //    std::num::NonZeroU32::new(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING) as u32)
+            //        .map(glow::NativeVertexArray);
 
             gl.bind_vertex_array(Some(self.vao));
 
@@ -119,8 +119,8 @@ impl Circle {
             gl.line_width(3.0);
             gl.draw_arrays(glow::TRIANGLE_FAN, 0, self.vertices.try_into().unwrap());
 
-            gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
-            gl.bind_vertex_array(old_vao);
+            //gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
+            //gl.bind_vertex_array(old_vao);
             gl.use_program(None);
         }
     }

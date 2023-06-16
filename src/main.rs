@@ -132,14 +132,15 @@ impl EGLUnderlay {
 
             gl.use_program(Some(self.program));
 
-            let old_buffer =
-                std::num::NonZeroU32::new(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING) as u32)
-                    .map(glow::NativeBuffer);
+            //let old_buffer =
+            //    std::num::NonZeroU32::new(gl.get_parameter_i32(glow::ARRAY_BUFFER_BINDING) as u32)
+            //        .map(glow::NativeBuffer);
+
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
 
-            let old_vao =
-                std::num::NonZeroU32::new(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING) as u32)
-                    .map(glow::NativeVertexArray);
+            //let old_vao =
+            //    std::num::NonZeroU32::new(gl.get_parameter_i32(glow::VERTEX_ARRAY_BINDING) as u32)
+            //        .map(glow::NativeVertexArray);
 
             gl.bind_vertex_array(Some(self.vao));
 
@@ -188,8 +189,8 @@ impl EGLUnderlay {
 
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
 
-            gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
-            gl.bind_vertex_array(old_vao);
+            //gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
+            //gl.bind_vertex_array(old_vao);
             gl.use_program(None);
         }
     }
@@ -197,15 +198,16 @@ impl EGLUnderlay {
 
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen(start))]
 pub fn main() {
+    // This provides better error messages in debug mode.
+    // It's disabled in release mode so it doesn't bloat up the file size.
+    #[cfg(all(debug_assertions, target_arch = "wasm32"))]
+    console_error_panic_hook::set_once();
+
     let app = MainWindow::new().unwrap();
-
     let mut underlay = None;
-
     let app_weak = app.as_weak();
-
     let circs = Rc::new(slint::VecModel::<Circ>::from(vec![]));
     app.set_points(circs.clone().into());
-
     let circ_clone = circs.clone();
 
     app.on_add_point(move |event, mouse_x, mouse_y| match event.button {
@@ -338,7 +340,7 @@ slint::slint! {
             // rectangle fills the rest of the screen
             area := TouchArea {
                 pointer-event(e) => {
-                    root.add_point(e, self.mouse-x, self.mouse-y);
+                    root.add_point(e, -self.absolute-x + self.mouse-x, self.absolute-y + self.mouse-y);
                 }
             }
             for r in root.points : Rectangle {
@@ -350,6 +352,7 @@ slint::slint! {
                 border-width: 2px;
                 border-color: blue;
                 border-radius: self.width/2;
+
             }
         }
     }

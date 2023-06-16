@@ -8,14 +8,17 @@ edition = "2021"
 [dependencies]
 glow = "0.12.2"
 nalgebra-glm = "0.18.0"
-slint = "1.0.2"
+slint = { git = "https://github.com/slint-ui/slint.git" }
 
+[profile.release]
+debug = true
 
 [lib]
 crate-type = ["cdylib"]
 path = "src/main.rs"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+slint = { git = "https://github.com/slint-ui/slint.git" }
 wasm-bindgen = { version = "0.2" }
 web-sys = { version = "0.3", features=["console"] }
 console_error_panic_hook = "0.1.5"
