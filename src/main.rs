@@ -185,13 +185,13 @@ impl EGLUnderlay {
             };
             gl.uniform_4_f32_slice(Some(&self.uniform_locs["points"]), points_vec.as_slice());
 
-            println!("Points is {}", points_vec);
+            //println!("Points is {}", points_vec);
 
             gl.draw_arrays(glow::TRIANGLE_STRIP, 0, 4);
 
             //gl.bind_buffer(glow::ARRAY_BUFFER, old_buffer);
             //gl.bind_vertex_array(old_vao);
-            gl.use_program(None);
+            //gl.use_program(None);
         }
     }
 }
@@ -215,7 +215,6 @@ pub fn main() {
             PointerEventKind::Up => {
                 let circs_model = circs.clone();
                 if circs_model.row_count() < 2 {
-                    println!("Mouse is at ({},{})", mouse_x, mouse_y);
                     circs_model.push(Circ {
                         pos_x: mouse_x,
                         pos_y: mouse_y,
